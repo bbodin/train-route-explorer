@@ -9,6 +9,7 @@ export function routeConfigSummary(config = {}) {
   return {
     departures: config.local_origins || [],
     via: config.connection_stations || [],
+    avoid: config.avoid_stations || [],
     arrivals: config.side_b_destinations || [],
     trainTypes: config.train_types || [],
     minTransferMinutes: config.min_transfer_minutes,

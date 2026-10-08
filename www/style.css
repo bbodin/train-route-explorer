@@ -270,12 +270,37 @@ main { width: 100%; padding: 0 14px 18px; }
   gap: 5px;
 }
 
-.day-control input {
+.day-calendar-selector {
   width: 148px;
-  min-height: 34px;
-  padding-block: 5px;
-  border-color: #bfc6ca;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 11px 23px;
+  overflow: hidden;
+  border: 1px solid #bfc6ca;
+  border-radius: 4px;
   background: #fff;
+}
+
+.day-calendar-selector:focus-within { outline: 2px solid #26313a; outline-offset: 1px; }
+.day-calendar-selector:has(input:disabled) { opacity: 0.52; }
+
+.day-weekday {
+  padding: 1px 8px 0;
+  color: #6d7780;
+  font-size: 9px;
+  font-weight: 850;
+  line-height: 10px;
+  text-align: center;
+}
+
+.day-control input {
+  width: 100%;
+  min-height: 23px;
+  height: 23px;
+  padding: 0 6px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   font-size: 12px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -319,7 +344,7 @@ main { width: 100%; padding: 0 14px 18px; }
 .route-summary {
   min-height: var(--route-summary-height);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr) 24px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
   gap: 3px;
   padding: 6px 10px 8px;

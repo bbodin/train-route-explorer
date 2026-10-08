@@ -28,6 +28,7 @@ const {
   syncSetValue,
   syncStationState,
   todayGtfsDate,
+  updateDayWeekday,
   visibleRouteDays,
   worker,
   writeConfig,
@@ -344,9 +345,11 @@ els.dayCalendar.addEventListener("change", () => {
   if (!state.availableDays.includes(selected)) {
     setStatus("No service matching route settings for the selected calendar day.", 0, "error");
     els.dayCalendar.value = gtfsToIsoDate(state.selectedDay);
+    updateDayWeekday();
     return;
   }
   state.selectedDay = selected;
+  updateDayWeekday();
   saveSettings();
   if (state.settingsDirty) {
     showRefreshNotice();
@@ -422,8 +425,9 @@ els.trainTypes.addEventListener("change", (event) => {
 });
 for (const [role, container] of [
   ["local_origins", els.localOrigins],
-  ["connection_stations", els.connectionStations],
   ["side_b_destinations", els.sideBDestinations],
+  ["connection_stations", els.connectionStations],
+  ["avoid_stations", els.avoidStations],
 ]) {
   container.addEventListener("change", (event) => {
     if (event.target instanceof HTMLInputElement) {
@@ -453,7 +457,16 @@ for (const [role, container] of [
     }
   });
 }
-for (const input of [els.minTransfer, els.maxTransfer, els.maxTransferCount, els.maxDuration]) {
+for (const input of [
+  els.minTransfer,
+  els.maxTransfer,
+  els.maxTransferCount,
+  els.maxDuration,
+  els.firstDepartureTime,
+  els.lastDepartureTime,
+  els.firstArrivalTime,
+  els.lastArrivalTime,
+]) {
   input.addEventListener("change", showRefreshNotice);
 }
 

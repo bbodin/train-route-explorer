@@ -7,6 +7,10 @@ const minTransfer = document.querySelector("#config-min-transfer");
 const maxTransfer = document.querySelector("#config-max-transfer");
 const maxTransferCount = document.querySelector("#config-max-transfer-count");
 const maxDuration = document.querySelector("#config-max-duration");
+const firstDepartureTime = document.querySelector("#config-first-departure-time");
+const lastDepartureTime = document.querySelector("#config-last-departure-time");
+const firstArrivalTime = document.querySelector("#config-first-arrival-time");
+const lastArrivalTime = document.querySelector("#config-last-arrival-time");
 
 const settingsActionStyle = document.createElement("style");
 settingsActionStyle.textContent = `
@@ -64,6 +68,10 @@ function copySettings(config) {
     max_transfer_minutes: Number(config.max_transfer_minutes),
     max_transfer_count: Number(config.max_transfer_count),
     max_journey_duration_minutes: Number(config.max_journey_duration_minutes),
+    first_departure_time: String(config.first_departure_time || ""),
+    last_departure_time: String(config.last_departure_time || ""),
+    first_arrival_time: String(config.first_arrival_time || ""),
+    last_arrival_time: String(config.last_arrival_time || ""),
   };
 }
 
@@ -77,7 +85,11 @@ function sameSettings(left, right) {
     && left.min_transfer_minutes === right.min_transfer_minutes
     && left.max_transfer_minutes === right.max_transfer_minutes
     && left.max_transfer_count === right.max_transfer_count
-    && left.max_journey_duration_minutes === right.max_journey_duration_minutes;
+    && left.max_journey_duration_minutes === right.max_journey_duration_minutes
+    && left.first_departure_time === right.first_departure_time
+    && left.last_departure_time === right.last_departure_time
+    && left.first_arrival_time === right.first_arrival_time
+    && left.last_arrival_time === right.last_arrival_time;
 }
 
 function restoreSnapshot(snapshot) {
@@ -86,6 +98,10 @@ function restoreSnapshot(snapshot) {
   maxTransfer.value = String(snapshot.max_transfer_minutes);
   maxTransferCount.value = String(snapshot.max_transfer_count);
   maxDuration.value = String(snapshot.max_journey_duration_minutes);
+  firstDepartureTime.value = snapshot.first_departure_time;
+  lastDepartureTime.value = snapshot.last_departure_time;
+  firstArrivalTime.value = snapshot.first_arrival_time;
+  lastArrivalTime.value = snapshot.last_arrival_time;
   app.renderTrainTypePicker(app.state.context?.train_types || [], trainTypeFilter?.value || "");
   app.saveSettings();
 }
@@ -168,7 +184,16 @@ document.addEventListener("change", (event) => {
     return;
   }
 
-  if ([minTransfer, maxTransfer, maxTransferCount, maxDuration].includes(input)) {
+  if ([
+    minTransfer,
+    maxTransfer,
+    maxTransferCount,
+    maxDuration,
+    firstDepartureTime,
+    lastDepartureTime,
+    firstArrivalTime,
+    lastArrivalTime,
+  ].includes(input)) {
     // Keep numeric changes in the form until Apply; prevent app-events.js from
     // starting an expensive route/context refresh for each individual change.
     event.stopPropagation();

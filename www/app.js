@@ -1,9 +1,11 @@
 import { createTimeline } from "./timeline.js";
-import { routeConfigSummary, routeDebug } from "./route-debug.js";
+import { routeConfigSummary, routeDebug } from "./route-debug.js?v=0.2";
+import { normalizeTimeSetting } from "./time-constraints.js?v=0.1";
 
 const DEFAULT_CONFIG = {
   local_origins: ["Saujon", "Saintes"],
   connection_stations: ["Bordeaux Saint-Jean", "Poitiers", "Angoulême"],
+  avoid_stations: [],
   side_b_destinations: [
     "Paris Montparnasse Hall 1 - 2",
     "Massy TGV",
@@ -19,6 +21,10 @@ const DEFAULT_CONFIG = {
   max_transfer_minutes: 120,
   max_transfer_count: 2,
   max_journey_duration_minutes: 1440,
+  first_departure_time: "",
+  last_departure_time: "",
+  first_arrival_time: "",
+  last_arrival_time: "",
 };
 const SERVER_GTFS_URL = "./data/gtfs.zip";
 const SETTINGS_STORAGE_KEY = "train-route-explorer-settings-v1";
@@ -26,7 +32,7 @@ const DEFAULT_MAP_STYLE = "standard";
 const MAP_STYLE_VALUES = new Set(["standard", "muted", "monochrome", "dark"]);
 const AUTO_REFRESH_DELAY_MS = 300;
 const ROUTE_DAY_COUNT = 1;
-const ROUTE_PROTOCOL_VERSION = 6;
+const ROUTE_PROTOCOL_VERSION = 8;
 const TRAIN_TYPE_COLORS = {
   "TGV INOUI": "#2563eb",
   "OUIGO Grande Vitesse": "#c026d3",
@@ -60,12 +66,17 @@ function normalizeStoredConfig(config = {}) {
   return {
     local_origins: listSetting(config.local_origins, DEFAULT_CONFIG.local_origins),
     connection_stations: listSetting(config.connection_stations, DEFAULT_CONFIG.connection_stations),
+    avoid_stations: listSetting(config.avoid_stations, DEFAULT_CONFIG.avoid_stations),
     side_b_destinations: listSetting(config.side_b_destinations, DEFAULT_CONFIG.side_b_destinations),
     train_types: listSetting(config.train_types, DEFAULT_CONFIG.train_types),
     min_transfer_minutes: minTransfer,
     max_transfer_minutes: Math.max(minTransfer, maxTransfer),
     max_transfer_count: numericSetting(config.max_transfer_count, DEFAULT_CONFIG.max_transfer_count),
     max_journey_duration_minutes: numericSetting(config.max_journey_duration_minutes, DEFAULT_CONFIG.max_journey_duration_minutes),
+    first_departure_time: normalizeTimeSetting(config.first_departure_time),
+    last_departure_time: normalizeTimeSetting(config.last_departure_time),
+    first_arrival_time: normalizeTimeSetting(config.first_arrival_time),
+    last_arrival_time: normalizeTimeSetting(config.last_arrival_time),
   };
 }
 
@@ -130,6 +141,7 @@ const els = {
   uploadBtn: $("#load-upload"),
   localOrigins: $("#config-local-origins"),
   connectionStations: $("#config-connection-stations"),
+  avoidStations: $("#config-avoid-stations"),
   sideBDestinations: $("#config-side-b-destinations"),
   stationFilters: Array.from(document.querySelectorAll(".station-filter")),
   trainTypeFilter: $("#train-type-filter"),
@@ -138,8 +150,13 @@ const els = {
   maxTransfer: $("#config-max-transfer"),
   maxTransferCount: $("#config-max-transfer-count"),
   maxDuration: $("#config-max-duration"),
+  firstDepartureTime: $("#config-first-departure-time"),
+  lastDepartureTime: $("#config-last-departure-time"),
+  firstArrivalTime: $("#config-first-arrival-time"),
+  lastArrivalTime: $("#config-last-arrival-time"),
   mapStyle: $("#config-map-style"),
   dayCalendar: $("#day-calendar"),
+  dayWeekday: $("#day-weekday"),
   previousDayBtn: $("#previous-day-button"),
   todayBtn: $("#today-button"),
   nextDayBtn: $("#next-day-button"),
@@ -181,12 +198,17 @@ function readConfig() {
   return {
     local_origins: state.config.local_origins,
     connection_stations: state.config.connection_stations,
+    avoid_stations: state.config.avoid_stations,
     side_b_destinations: state.config.side_b_destinations,
     train_types: state.config.train_types,
     min_transfer_minutes: minTransfer,
     max_transfer_minutes: maxTransfer,
     max_transfer_count: Math.max(0, Number(els.maxTransferCount.value || 0)),
     max_journey_duration_minutes: Math.max(0, Number(els.maxDuration.value || 0)),
+    first_departure_time: normalizeTimeSetting(els.firstDepartureTime.value),
+    last_departure_time: normalizeTimeSetting(els.lastDepartureTime.value),
+    first_arrival_time: normalizeTimeSetting(els.firstArrivalTime.value),
+    last_arrival_time: normalizeTimeSetting(els.lastArrivalTime.value),
   };
 }
 
@@ -209,6 +231,10 @@ function writeConfig(config) {
   els.maxTransfer.value = config.max_transfer_minutes;
   els.maxTransferCount.value = config.max_transfer_count;
   els.maxDuration.value = config.max_journey_duration_minutes;
+  els.firstDepartureTime.value = normalizeTimeSetting(config.first_departure_time);
+  els.lastDepartureTime.value = normalizeTimeSetting(config.last_departure_time);
+  els.firstArrivalTime.value = normalizeTimeSetting(config.first_arrival_time);
+  els.lastArrivalTime.value = normalizeTimeSetting(config.last_arrival_time);
   if (els.mapStyle) els.mapStyle.value = mapStyleSetting(state.mapStyle);
 }
 
@@ -238,9 +264,23 @@ function isoToGtfsDate(day) {
   return String(day || "").replaceAll("-", "");
 }
 
+function weekdayLabel(day) {
+  const match = String(day || "").match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (!match) return "";
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+  return new Intl.DateTimeFormat("en", { weekday: "long" }).format(date);
+}
+
+function updateDayWeekday() {
+  const label = weekdayLabel(state.selectedDay);
+  els.dayWeekday.textContent = label;
+  els.dayWeekday.hidden = !label;
+}
+
 function stationContainer(role) {
   if (role === "local_origins") return els.localOrigins;
   if (role === "connection_stations") return els.connectionStations;
+  if (role === "avoid_stations") return els.avoidStations;
   return els.sideBDestinations;
 }
 
@@ -284,11 +324,11 @@ function renderCheckboxList(container, options, selected, filterText, showHighli
 function renderStationPicker(role, stations, config, filterText = "") {
   const container = stationContainer(role);
   const selected = selectedSet(config, role);
-  renderCheckboxList(container, stations.length ? stations : Array.from(selected), selected, filterText, true);
+  renderCheckboxList(container, stations.length ? stations : Array.from(selected), selected, filterText, role !== "avoid_stations");
 }
 
 function renderStationPickers(stations, config = state.config) {
-  for (const role of ["local_origins", "connection_stations", "side_b_destinations"]) {
+  for (const role of ["local_origins", "side_b_destinations", "connection_stations", "avoid_stations"]) {
     const filter = document.querySelector(`.station-filter[data-role="${role}"]`);
     renderStationPicker(role, stations, config, filter?.value || "");
   }
@@ -356,6 +396,7 @@ function populateContextControls(context) {
   els.dayCalendar.min = gtfsToIsoDate(context.available_days[0] || "");
   els.dayCalendar.max = gtfsToIsoDate(context.available_days[context.available_days.length - 1] || "");
   els.dayCalendar.value = gtfsToIsoDate(state.selectedDay);
+  updateDayWeekday();
   els.dayCalendar.title = context.available_days.length
     ? `Available service days: ${context.available_days.map(gtfsToIsoDate).join(", ")}`
     : "No available service days";
@@ -509,9 +550,10 @@ export const app = {
   syncSetValue,
   syncStationState,
   todayGtfsDate,
+  updateDayWeekday,
   visibleRouteDays,
   worker,
   writeConfig,
 };
 
-import("./app-events.js?v=0.20");
+import("./app-events.js?v=0.23");

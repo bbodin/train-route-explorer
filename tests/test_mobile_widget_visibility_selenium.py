@@ -96,10 +96,11 @@ def _assert_mobile_widgets_fully_visible(self, state_name):
         for (const element of candidates) {
           if (!rendered(element)) continue;
 
-          // Bring each widget into the nearest visible position. This lets the
-          // test cover long pages and scrollable drawers without treating a
-          // normal below-the-fold control as clipped.
-          element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          // Center each widget through nested scroll containers before
+          // measuring it. With "nearest", Chromium can satisfy an inner
+          // checklist scroller while that checklist is still partly outside
+          // the viewport, producing a false clipping failure.
+          element.scrollIntoView({ block: 'center', inline: 'nearest' });
           if (!rendered(element)) continue;
 
           const rect = element.getBoundingClientRect();

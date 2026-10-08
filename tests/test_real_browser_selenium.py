@@ -106,6 +106,32 @@ def test_40_paris_filter_works_for_departure_via_and_arrival_and_can_select(self
     )
 
 
+def test_35_calendar_shows_selected_weekday_name(self):
+    result = self.driver.execute_script(
+        """
+        const input = document.querySelector('#day-calendar');
+        const weekday = document.querySelector('#day-weekday');
+        const selectedDate = input?.value || '';
+        const expected = selectedDate
+          ? new Intl.DateTimeFormat('en', { weekday: 'long' }).format(new Date(`${selectedDate}T12:00:00`))
+          : '';
+        return {
+          selectedDate,
+          actual: weekday?.textContent.trim() || '',
+          expected,
+          hidden: weekday?.hidden ?? true,
+        };
+        """
+    )
+    self.assertTrue(result["selectedDate"], result)
+    self.assertFalse(result["hidden"], result)
+    self.assertEqual(result["actual"], result["expected"], result)
+    self.assertIn(
+        result["actual"],
+        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    )
+
+
 def test_55_saujon_massy_via_angouleme_current_service_day(self):
     result = self.driver.execute_async_script(
         """
@@ -285,6 +311,9 @@ def test_55_saujon_massy_via_angouleme_current_service_day(self):
 
 StationFilterRegressionTest.test_40_paris_filter_works_for_departure_via_and_arrival_and_can_select = (
     test_40_paris_filter_works_for_departure_via_and_arrival_and_can_select
+)
+StationFilterRegressionTest.test_35_calendar_shows_selected_weekday_name = (
+    test_35_calendar_shows_selected_weekday_name
 )
 StationFilterRegressionTest.test_55_saujon_massy_via_angouleme_current_service_day = (
     test_55_saujon_massy_via_angouleme_current_service_day

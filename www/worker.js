@@ -1,5 +1,7 @@
 import init, { build_context, routes_for_day_with_progress } from "./pkg/train_route_explorer.js";
-import { routeConfigSummary, routeDebug } from "./route-debug.js";
+import { routeConfigSummary, routeDebug } from "./route-debug.js?v=0.2";
+import { applyRouteStationConstraints } from "./route-constraints.js?v=0.1";
+import { applyRouteTimeConstraints, normalizeTimeSetting } from "./time-constraints.js?v=0.1";
 
 const CACHE_DB = "train-route-explorer";
 const DB_VERSION = 2;
@@ -7,7 +9,7 @@ const CONTEXT_STORE = "contexts";
 const SOURCE_STORE = "sources";
 const LAST_SOURCE_KEY = "__last_source__";
 const CACHE_VERSION = "gtfs-context-v5";
-const ROUTE_PROTOCOL_VERSION = 6;
+const ROUTE_PROTOCOL_VERSION = 8;
 
 let wasmReady = false;
 let archiveBytes = null;
@@ -73,21 +75,26 @@ function normalizedConfig(config) {
   return {
     local_origins: list(config.local_origins),
     connection_stations: list(config.connection_stations),
+    avoid_stations: list(config.avoid_stations),
     side_b_destinations: list(config.side_b_destinations),
     train_types: list(config.train_types),
     min_transfer_minutes: minTransfer,
     max_transfer_minutes: maxTransfer,
     max_transfer_count: Math.max(0, Number(config.max_transfer_count ?? 2)),
     max_journey_duration_minutes: Math.max(0, Number(config.max_journey_duration_minutes ?? 1440)),
+    first_departure_time: normalizeTimeSetting(config.first_departure_time),
+    last_departure_time: normalizeTimeSetting(config.last_departure_time),
+    first_arrival_time: normalizeTimeSetting(config.first_arrival_time),
+    last_arrival_time: normalizeTimeSetting(config.last_arrival_time),
   };
 }
 
 function buildConfigForCore(config) {
   return {
     local_origins: config.local_origins,
-    // Via stations are a route acceptance constraint, not a transfer whitelist.
-    // Build the core with unrestricted interchange stations so the router may
-    // transfer anywhere that is needed to reach a selected via station.
+    // Via and Avoid stations are route acceptance constraints, not transfer
+    // whitelists. Keep the core unrestricted so changing either list can reuse
+    // the same cached GTFS routing context.
     connection_stations: [],
     side_b_destinations: config.side_b_destinations,
     train_types: config.train_types,
@@ -108,8 +115,13 @@ function isDirectionSwap(nextConfig) {
     && sameList(nextConfig.local_origins, activeConfig.side_b_destinations)
     && sameList(nextConfig.side_b_destinations, activeConfig.local_origins)
     && sameList(nextConfig.connection_stations, activeConfig.connection_stations)
+    && sameList(nextConfig.avoid_stations, activeConfig.avoid_stations)
     && sameList(nextConfig.train_types, activeConfig.train_types)
     && nextConfig.max_transfer_count === activeConfig.max_transfer_count
+    && nextConfig.first_departure_time === activeConfig.first_departure_time
+    && nextConfig.last_departure_time === activeConfig.last_departure_time
+    && nextConfig.first_arrival_time === activeConfig.first_arrival_time
+    && nextConfig.last_arrival_time === activeConfig.last_arrival_time
   );
 }
 
@@ -350,34 +362,6 @@ function applyPublicTrainCodes(result) {
   return result;
 }
 
-function itineraryPassesVia(itinerary, requiredViaStations) {
-  const required = new Set((requiredViaStations || []).map(String).filter(Boolean));
-  if (!required.size) return true;
-
-  const departure = String(itinerary?.departure_stop || "");
-  const destination = String(itinerary?.destination_stop || "");
-  for (const leg of itinerary?.legs || []) {
-    const stations = [
-      String(leg.departure_stop || ""),
-      ...(leg.path || []).map((stop) => String(stop?.stop_name || "")),
-      String(leg.destination_stop || ""),
-    ];
-    if (stations.some((station) => station !== departure && station !== destination && required.has(station))) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function applyRequiredVia(result, requiredViaStations) {
-  if (!(requiredViaStations || []).length) return result;
-  return {
-    ...result,
-    outward: (result.outward || []).filter((itinerary) => itineraryPassesVia(itinerary, requiredViaStations)),
-    returns: (result.returns || []).filter((itinerary) => itineraryPassesVia(itinerary, requiredViaStations)),
-  };
-}
-
 async function buildOrLoadContext(config) {
   if (!archiveBytes || !sourceMeta) {
     throw new Error("Load a GTFS archive first.");
@@ -435,7 +419,7 @@ async function computeRoutes(days, overrides = {}, onProgress = null, selectedDa
     const dayStartedAt = performance.now();
     let lastReportedPercent = -1;
     routeDebug("worker", "service day routing started", { day, index: index + 1, total: requestedDays.length });
-    const dayResult = applyRequiredVia(applyPublicTrainCodes(routes_for_day_with_progress(activeContext, {
+    const dayResult = applyRouteStationConstraints(applyPublicTrainCodes(routes_for_day_with_progress(activeContext, {
       selected_day: day,
       min_transfer_minutes: config.min_transfer_minutes,
       max_transfer_minutes: config.max_transfer_minutes,
@@ -455,14 +439,15 @@ async function computeRoutes(days, overrides = {}, onProgress = null, selectedDa
         totalWork: total,
         percent,
       });
-    })), config.connection_stations);
-    result.outward.push(...(dayResult.outward || []));
-    result.returns.push(...(dayResult.returns || []));
+    })), config.connection_stations, config.avoid_stations);
+    const filteredDayResult = applyRouteTimeConstraints(dayResult, config);
+    result.outward.push(...(filteredDayResult.outward || []));
+    result.returns.push(...(filteredDayResult.returns || []));
     routeDebug("worker", "service day routing completed", {
       day,
       elapsedMs: Math.round(performance.now() - dayStartedAt),
-      outwardCount: dayResult.outward?.length || 0,
-      returnCount: dayResult.returns?.length || 0,
+      outwardCount: filteredDayResult.outward?.length || 0,
+      returnCount: filteredDayResult.returns?.length || 0,
     });
     if (onProgress && index + 1 < requestedDays.length) {
       onProgress(result, index + 1, requestedDays.length);

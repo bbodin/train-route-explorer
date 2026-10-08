@@ -77,7 +77,7 @@ layoutEnhancementStyle.textContent = `
   .route-summary {
     min-height: var(--route-summary-height) !important;
     display: grid !important;
-    grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr) minmax(0, 1fr) !important;
+    grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) !important;
     align-items: center !important;
     gap: 8px !important;
     padding: 5px 12px !important;
@@ -96,8 +96,9 @@ layoutEnhancementStyle.textContent = `
   }
 
   .route-summary-item[data-route-item="local_origins"] { justify-content: flex-start; }
+  .route-summary-item[data-route-item="side_b_destinations"],
   .route-summary-item[data-route-item="connection_stations"] { justify-content: center; }
-  .route-summary-item[data-route-item="side_b_destinations"] { justify-content: flex-end; }
+  .route-summary-item[data-route-item="avoid_stations"] { justify-content: flex-end; }
 
   .route-summary-stop {
     width: min(100%, 460px);
@@ -115,12 +116,13 @@ layoutEnhancementStyle.textContent = `
     transition: border-color 130ms ease, background 130ms ease, box-shadow 130ms ease;
   }
 
+  .route-summary-item[data-route-item="side_b_destinations"] .route-summary-stop,
   .route-summary-item[data-route-item="connection_stations"] .route-summary-stop {
     justify-content: center;
     text-align: center;
   }
 
-  .route-summary-item[data-route-item="side_b_destinations"] .route-summary-stop {
+  .route-summary-item[data-route-item="avoid_stations"] .route-summary-stop {
     justify-content: flex-end;
     text-align: right;
   }
@@ -177,11 +179,12 @@ layoutEnhancementStyle.textContent = `
   }
 
   .route-summary-item[data-route-item="local_origins"] .route-selector-panel { left: 0; }
+  .route-summary-item[data-route-item="side_b_destinations"] .route-selector-panel,
   .route-summary-item[data-route-item="connection_stations"] .route-selector-panel {
     left: 50%;
     transform: translateX(-50%);
   }
-  .route-summary-item[data-route-item="side_b_destinations"] .route-selector-panel { right: 0; }
+  .route-summary-item[data-route-item="avoid_stations"] .route-selector-panel { right: 0; }
   .route-selector-panel[hidden] { display: none; }
 
   .route-selector-panel .station-picker {
@@ -321,10 +324,64 @@ layoutEnhancementStyle.textContent = `
   }
 
   @media (max-width: 560px) {
+    :root {
+      --header-height: 84px;
+      --route-summary-height: 80px;
+    }
+
+    .app-header {
+      height: var(--header-height);
+      grid-template-columns: minmax(0, 1fr) 92px !important;
+      grid-template-areas: "brand brand" "date view";
+      grid-template-rows: 28px 36px;
+      gap: 6px 8px !important;
+      align-content: start;
+      padding: 10px 10px 4px !important;
+    }
+
     .brand-rail { display: none; }
-    .brand strong { font-size: 12px; }
-    .header-tools { gap: 3px !important; }
-    .header-tools .toolbar-menus { gap: 3px; }
+    .brand {
+      grid-area: brand;
+      min-width: 0;
+      max-width: calc(100% - 142px);
+      width: max-content;
+      justify-self: start;
+      align-self: center;
+    }
+    .brand > span:last-child { display: block; }
+    .brand small { display: none; }
+    .brand strong { font-size: 13px; white-space: nowrap; }
+    .brand .app-version { color: #59636b !important; font-size: 10px !important; }
+
+    .header-tools {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex !important;
+      align-items: center;
+      gap: 4px !important;
+    }
+
+    .app-header > #route-view-tabs {
+      grid-area: view;
+      justify-self: stretch;
+      align-self: center;
+      width: 92px;
+    }
+
+    .header-tools .toolbar-menus {
+      display: flex;
+      gap: 4px;
+    }
+
+    .app-header .status {
+      max-width: 12px !important;
+      grid-template-columns: 8px !important;
+      gap: 0 !important;
+    }
+
+    #cache-status-text { display: none; }
+    .status progress { display: none; }
 
     .header-tools .toolbar-menu summary,
     .case-study-link {
@@ -332,9 +389,111 @@ layoutEnhancementStyle.textContent = `
       padding: 4px 6px;
       font-size: 10px;
     }
+
+    .app-header > .day-control {
+      grid-area: date;
+      justify-self: stretch;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .app-header .day-calendar-selector {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .app-header .day-control input { width: 100%; min-width: 0; }
+    .app-header .day-control button {
+      min-height: 32px;
+      padding-inline: 8px;
+    }
+    .app-header .day-control .day-arrow {
+      min-width: 30px;
+      padding-inline: 6px;
+    }
+
+    .route-summary {
+      grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+      grid-template-areas:
+        "depart depart swap swap arrival arrival"
+        "via via via avoid avoid avoid";
+      gap: 4px 6px !important;
+      padding: 4px 8px !important;
+      align-content: center;
+    }
+
+    .route-summary-item[data-route-item="local_origins"] { grid-area: depart; }
+    .route-summary-item[data-route-item="side_b_destinations"] { grid-area: arrival; }
+    .route-summary-item[data-route-item="connection_stations"] { grid-area: via; }
+    .route-summary-item[data-route-item="avoid_stations"] { grid-area: avoid; }
+    .route-summary-item { justify-content: stretch !important; }
+
+    .route-summary-item .route-summary-stop {
+      width: 100%;
+      min-height: 34px;
+      justify-content: flex-start !important;
+      text-align: left !important;
+      padding-inline: 7px !important;
+    }
+
+    .route-summary-stop span {
+      display: inline !important;
+      font-size: 8px !important;
+    }
+
+    .route-summary-stop strong { font-size: 10px !important; }
+
+    .route-selector-panel {
+      top: var(--header-height);
+      max-height: calc(100vh - var(--header-height) - 8px);
+    }
+
+    .route-swap-button {
+      grid-area: swap;
+      justify-self: center;
+      align-self: stretch;
+      width: 74px;
+      height: 34px;
+      min-width: 0;
+      padding-inline: 5px;
+    }
+  }
+
+  @media (max-width: 350px) {
+    .app-header {
+      grid-template-columns: minmax(0, 1fr) 84px !important;
+      padding-inline: 8px !important;
+      gap: 6px 6px !important;
+    }
+
+    .brand strong { font-size: 12px; }
+    .brand .app-version { display: none; }
+
+    .header-tools { right: 8px; gap: 3px !important; }
+    .header-tools .toolbar-menus { gap: 3px; }
+    .header-tools .toolbar-menu summary,
+    .case-study-link {
+      padding-inline: 5px;
+      font-size: 9px;
+    }
+
+    .app-header > #route-view-tabs { width: 84px; }
+    .route-summary { gap: 4px !important; padding-inline: 6px !important; }
+    .route-swap-button { width: 68px; font-size: 10px; }
   }
 `;
 document.head.append(layoutEnhancementStyle);
+
+const mobileHeaderQuery = window.matchMedia("(max-width: 560px)");
+
+function placeViewTabs() {
+  if (!viewTabs || !appHeader || !headerTools) return;
+  if (mobileHeaderQuery.matches) {
+    if (viewTabs.parentElement !== appHeader) appHeader.insertBefore(viewTabs, headerTools);
+  } else if (viewTabs.parentElement !== headerTools) {
+    headerTools.insertBefore(viewTabs, status || headerTools.firstChild);
+  }
+}
 
 function reorganizeHeader() {
   if (!appHeader || !headerTools) return;
@@ -343,9 +502,7 @@ function reorganizeHeader() {
     appHeader.insertBefore(dayControl, headerTools);
   }
 
-  if (viewTabs && viewTabs.parentElement !== headerTools) {
-    headerTools.insertBefore(viewTabs, status || headerTools.firstChild);
-  }
+  placeViewTabs();
 
   if (toolbarMenus && toolbarMenus.parentElement !== headerTools) {
     headerTools.insertBefore(toolbarMenus, aboutLink || null);
@@ -353,7 +510,7 @@ function reorganizeHeader() {
 
   if (routeSettings) {
     const summary = routeSettings.querySelector(":scope > summary");
-    if (summary) summary.textContent = "Settings";
+    if (summary) summary.textContent = "Config";
   }
 
   if (toolbarPrimary) toolbarPrimary.setAttribute("aria-hidden", "true");
@@ -551,6 +708,7 @@ if (status) {
   });
 }
 
+mobileHeaderQuery.addEventListener("change", placeViewTabs);
 reorganizeHeader();
 installInlineRouteSelectors();
 updateRouteSummary();

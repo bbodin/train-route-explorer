@@ -4,12 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Train Route Explorer</title>
-    <link rel="stylesheet" href="./style.css?v=0.28" />
-    <link rel="stylesheet" href="./controls.css?v=0.31" />
+    <link rel="stylesheet" href="./style.css?v=0.30" />
+    <link rel="stylesheet" href="./controls.css?v=0.34" />
     <script type="importmap">
       {
         "imports": {
-          "./app.js?v=0.16": "./app.js?v=0.34",
+          "./app.js?v=0.16": "./app.js?v=0.37",
           "./journey-detail-style.js?v=0.19": "./journey-detail-style.js?v=0.26",
           "./timeline.js": "./timeline.js?v=0.23"
         }
@@ -21,7 +21,7 @@
       <div class="brand">
         <span class="brand-rail" aria-hidden="true"><i></i><i></i></span>
         <span>
-          <strong>Train Route Explorer <span class="app-version" style="margin-left:4px;color:#9aa09f;font-size:9px;font-weight:600;letter-spacing:0;vertical-align:baseline;">v0.43</span></strong>
+          <strong>Train Route Explorer <span class="app-version" style="margin-left:4px;color:#9aa09f;font-size:9px;font-weight:600;letter-spacing:0;vertical-align:baseline;">v0.49</span></strong>
           <small>working timetable</small>
         </span>
       </div>
@@ -59,7 +59,10 @@
             <div class="day-control">
               <button id="previous-day-button" class="day-arrow" type="button" aria-label="Previous service day" title="Previous service day" disabled>←</button>
               <label class="visually-hidden" for="day-calendar">Day</label>
-              <input id="day-calendar" type="date" disabled />
+              <span class="day-calendar-selector">
+                <span id="day-weekday" class="day-weekday" aria-live="polite" hidden></span>
+                <input id="day-calendar" type="date" disabled />
+              </span>
               <button id="today-button" type="button" disabled>Today</button>
               <button id="next-day-button" type="button" class="day-arrow" aria-label="Next service day" title="Next service day" disabled>→</button>
             </div>
@@ -81,6 +84,11 @@
                       <input class="station-filter" type="search" placeholder="Filter stations" data-role="local_origins" />
                       <div id="config-local-origins" class="station-checklist"></div>
                     </fieldset>
+                    <fieldset class="station-picker" data-role="side_b_destinations">
+                      <legend>Arrival stations</legend>
+                      <input class="station-filter" type="search" placeholder="Filter stations" data-role="side_b_destinations" />
+                      <div id="config-side-b-destinations" class="station-checklist"></div>
+                    </fieldset>
                     <fieldset class="station-picker" data-role="connection_stations">
                       <legend>Via stations</legend>
                       <div id="via-mode-switch" class="via-mode-switch" role="group" aria-label="Via mode">
@@ -90,10 +98,10 @@
                       <input class="station-filter" type="search" placeholder="Filter stations" data-role="connection_stations" />
                       <div id="config-connection-stations" class="station-checklist"></div>
                     </fieldset>
-                    <fieldset class="station-picker" data-role="side_b_destinations">
-                      <legend>Arrival stations</legend>
-                      <input class="station-filter" type="search" placeholder="Filter stations" data-role="side_b_destinations" />
-                      <div id="config-side-b-destinations" class="station-checklist"></div>
+                    <fieldset class="station-picker" data-role="avoid_stations">
+                      <legend>Avoid stations</legend>
+                      <input class="station-filter" type="search" placeholder="Filter stations" data-role="avoid_stations" />
+                      <div id="config-avoid-stations" class="station-checklist"></div>
                     </fieldset>
                     <fieldset class="option-picker" data-role="train_types">
                       <legend>Service / ticket brand</legend>
@@ -132,6 +140,37 @@
                         <span id="max-duration-unit" class="input-unit">hours</span>
                       </span>
                     </label>
+                  </section>
+
+                  <section class="journey-time-window-panel" aria-labelledby="config-time-window-heading">
+                    <div class="time-window-heading">
+                      <h3 id="config-time-window-heading">Time</h3>
+                      <span>Optional</span>
+                    </div>
+                    <div class="time-window-groups">
+                      <fieldset>
+                        <legend>Departure</legend>
+                        <label>
+                          First departure
+                          <input id="config-first-departure-time" type="time" step="60" />
+                        </label>
+                        <label>
+                          Last departure
+                          <input id="config-last-departure-time" type="time" step="60" />
+                        </label>
+                      </fieldset>
+                      <fieldset>
+                        <legend>Arrival</legend>
+                        <label>
+                          First arrival
+                          <input id="config-first-arrival-time" type="time" step="60" />
+                        </label>
+                        <label>
+                          Last arrival
+                          <input id="config-last-arrival-time" type="time" step="60" />
+                        </label>
+                      </fieldset>
+                    </div>
                   </section>
 
                   <section class="map-config-panel" aria-labelledby="map-style-label">
@@ -181,14 +220,17 @@
               <strong data-route-value="local_origins">—</strong>
             </button>
             <button id="swap-stations-button" class="route-swap-button" type="button" aria-label="Exchange departure and arrival stations" title="Exchange departure and arrival stations">&lt;- Swap -&gt;</button>
+            <button type="button" class="route-summary-stop" data-route-role="side_b_destinations">
+              <span>Arrival</span>
+              <strong data-route-value="side_b_destinations">—</strong>
+            </button>
             <button type="button" class="route-summary-stop" data-route-role="connection_stations">
               <span>Via</span>
               <strong data-route-value="connection_stations">—</strong>
             </button>
-            <span class="route-summary-arrow" aria-hidden="true">→</span>
-            <button type="button" class="route-summary-stop" data-route-role="side_b_destinations">
-              <span>Arrival</span>
-              <strong data-route-value="side_b_destinations">—</strong>
+            <button type="button" class="route-summary-stop" data-route-role="avoid_stations">
+              <span>Avoid</span>
+              <strong data-route-value="avoid_stations">—</strong>
             </button>
           </nav>
         </header>
@@ -203,8 +245,8 @@
     <div id="train-detail-dismiss-layer" hidden></div>
     <aside id="train-detail-frame" hidden></aside>
 
-    <script type="module" src="./app.js?v=0.34"></script>
-    <script type="module" src="./layout.js?v=0.28"></script>
+    <script type="module" src="./app.js?v=0.37"></script>
+    <script type="module" src="./layout.js?v=0.35"></script>
     <script type="module" src="./panels.js?v=0.19"></script>
     <script type="module" src="./sorting.js?grouped-sorting=2"></script>
     <script type="module" src="./row-details.js?v=0.26"></script>
@@ -213,7 +255,7 @@
     <script type="module" src="./legend-config.js"></script>
     <script type="module" src="./station-actions.js?v=0.18"></script>
     <script type="module" src="./station-filter-actions.js?v=0.18"></script>
-    <script type="module" src="./settings-actions.js?v=0.18"></script>
+    <script type="module" src="./settings-actions.js?v=0.19"></script>
     <script type="module" src="./settings-layout.js?v=0.19"></script>
     <script type="module" src="./via-mode.js?v=0.16"></script>
     <script type="module" src="./journey-detail-style.js?v=0.26"></script>
